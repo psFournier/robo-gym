@@ -13,6 +13,17 @@ register(
     entry_point='robo_gym.envs:ExampleEnvRob',
 )
 
+# Wifibot Environments
+register(
+    id='NoObstacleNavigationWifibotSim-v0',
+    entry_point='robo_gym.envs:NoObstacleNavigationWifibotSim',
+)
+
+register(
+    id='NoObstacleNavigationWifibotRob-v0',
+    entry_point='robo_gym.envs:NoObstacleNavigationWifibotRob',
+)
+
 # MiR100 Environments
 register(
     id='NoObstacleNavigationMir100Sim-v0',
