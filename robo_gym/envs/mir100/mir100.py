@@ -406,7 +406,7 @@ class NoObstacleNavigationMir100(Mir100Env):
         return reward, done, info
 
 class NoObstacleNavigationMir100Sim(NoObstacleNavigationMir100, Simulation):
-    cmd = "roslaunch mir100_robot_server sim_robot_server.launch"
+    cmd = "source /home/pierre/PycharmProjects/robo_gym_robot_servers_ws/devel/setup.bash; roslaunch mir100_robot_server sim_robot_server.launch"
     def __init__(self, ip=None, lower_bound_port=None, upper_bound_port=None, gui=False, **kwargs):
         Simulation.__init__(self, self.cmd, ip, lower_bound_port, upper_bound_port, gui, **kwargs)
         NoObstacleNavigationMir100.__init__(self, rs_address=self.robot_server_ip, **kwargs)
