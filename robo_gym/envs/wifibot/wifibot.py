@@ -285,10 +285,10 @@ class WifibotEnv(gym.Env):
         # Robot velocity range tolerance
         vel_tolerance = 0.1
         # Robot velocity range used to determine if there is an error in the sensor readings
-        max_lin_vel = self.mir100.get_max_lin_vel() + vel_tolerance
-        min_lin_vel = self.mir100.get_min_lin_vel() - vel_tolerance
-        max_ang_vel = self.mir100.get_max_ang_vel() + vel_tolerance
-        min_ang_vel = self.mir100.get_min_ang_vel() - vel_tolerance
+        max_lin_vel = self.wifibot.get_max_lin_vel() + vel_tolerance
+        min_lin_vel = self.wifibot.get_min_lin_vel() - vel_tolerance
+        max_ang_vel = self.wifibot.get_max_ang_vel() + vel_tolerance
+        min_ang_vel = self.wifibot.get_min_ang_vel() - vel_tolerance
         max_vel = np.array([max_lin_vel, max_ang_vel])
         min_vel = np.array([min_lin_vel, min_ang_vel])
         # Laser readings range
@@ -408,7 +408,7 @@ class NoObstacleNavigationWifibot(WifibotEnv):
 
 
 class NoObstacleNavigationWifibotSim(NoObstacleNavigationWifibot, Simulation):
-    cmd = "source /home/pierre/PycharmProjects/robo_gym_robot_servers_ws/devel/setup.bash; roslaunch wifibot_robot_server sim_wifibot_server.launch"
+    cmd = "source /home/pierre/PycharmProjects/robo_gym_robot_servers_ws/devel/setup.bash; roslaunch wifibot_robot_server sim_wifibot_server_minimal.launch"
 
     def __init__(self, ip=None, lower_bound_port=None, upper_bound_port=None, gui=False, **kwargs):
         Simulation.__init__(self, self.cmd, ip, lower_bound_port, upper_bound_port, gui, **kwargs)
