@@ -5,12 +5,11 @@ import numpy as np
 import gym
 from gym import spaces, logger
 from gym.utils import seeding
-from robo_gym.utils import utils, mir100_utils
+from robo_gym.utils import utils, mir100_utils, wifibot_utils
 from robo_gym.utils.exceptions import InvalidStateError, RobotServerError
 import robo_gym_server_modules.robot_server.client as rs_client
 from robo_gym.envs.simulation_wrapper import Simulation
 from robo_gym_server_modules.robot_server.grpc_msgs.python import robot_server_pb2
-
 
 class WifibotEnv(gym.Env):
     """Wifibot base environment.
@@ -32,20 +31,21 @@ class WifibotEnv(gym.Env):
     """
 
     real_robot = False
-    max_episode_steps = 500
+    laser_len = 1080
+    max_episode_steps = 100
 
     def __init__(self, rs_address=None, **kwargs):
 
-        self.wifibot = mir100_utils.Mir100()
+        self.wifibot = wifibot_utils.Wifibot()
         self.elapsed_steps = 0
         self.observation_space = self._get_observation_space()
         self.action_space = spaces.Box(low=np.full((2), -1.0), high=np.full((2), 1.0), dtype=np.float32)
         self.seed()
         self.distance_threshold = 0.2
         self.min_target_dist = 1.0
-        # Maximum linear velocity (m/s) of MiR
+        # Maximum linear velocity (m/s) of wifibot
         max_lin_vel = 0.5
-        # Maximum angular velocity (rad/s) of MiR
+        # Maximum angular velocity (rad/s) of wifibot
         max_ang_vel = 0.7
         self.max_vel = np.array([max_lin_vel, max_ang_vel])
 
@@ -60,7 +60,7 @@ class WifibotEnv(gym.Env):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
 
-    def reset(self, start_pose=None, target_pose=None):
+    def reset(self, start_pose = None, target_pose = None):
         """Environment reset.
 
         Args:
@@ -81,7 +81,7 @@ class WifibotEnv(gym.Env):
 
         # Set Robot starting position
         if start_pose:
-            assert len(start_pose) == 3
+            assert len(start_pose)==3
         else:
             start_pose = self._get_start_pose()
 
@@ -89,13 +89,13 @@ class WifibotEnv(gym.Env):
 
         # Set target position
         if target_pose:
-            assert len(target_pose) == 3
+            assert len(target_pose)==3
         else:
             target_pose = self._get_target(start_pose)
         rs_state[0:3] = target_pose
 
         # Set initial state of the Robot Server
-        state_msg = robot_server_pb2.State(state=rs_state.tolist())
+        state_msg = robot_server_pb2.State(state = rs_state.tolist())
         if not self.client.set_state_msg(state_msg):
             raise RobotServerError("set_state")
 
@@ -161,13 +161,12 @@ class WifibotEnv(gym.Env):
         """
 
         target = [0.0] * 3
-        mir_pose = [0.0] * 3
-        mir_twist = [0.0] * 2
-        f_scan = [0.0] * 501
-        b_scan = [0.0] * 511
+        pose = [0.0] * 3
+        twist = [0.0] * 2
+        scan = [0.0] * 1080
         collision = False
         obstacles = [0.0] * 9
-        rs_state = target + mir_pose + mir_twist + f_scan + b_scan + [collision] + obstacles
+        rs_state = target + pose + twist + scan + [collision] + obstacles
 
         return len(rs_state)
 
@@ -183,9 +182,9 @@ class WifibotEnv(gym.Env):
         """
 
         target_polar_coordinates = [0.0] * 2
-        mir_twist = [0.0] * 2
+        twist = [0.0] * 2
         laser = [0.0] * self.laser_len
-        env_state = target_polar_coordinates + mir_twist + laser
+        env_state = target_polar_coordinates + twist + laser
 
         return len(env_state)
 
@@ -258,7 +257,7 @@ class WifibotEnv(gym.Env):
         polar_theta = utils.normalize_angle_rad(polar_theta - rs_state[5])
 
         # Get Laser scanners data
-        raw_laser_scan = rs_state[8:1020]
+        raw_laser_scan = rs_state[8:1088]
 
         # Downsampling of laser values by picking every n-th value
         if self.laser_len > 0:
@@ -359,7 +358,6 @@ class WifibotEnv(gym.Env):
         else:
             return False
 
-
 class NoObstacleNavigationWifibot(WifibotEnv):
     laser_len = 0
 
@@ -372,8 +370,8 @@ class NoObstacleNavigationWifibot(WifibotEnv):
 
         # Calculate distance to the target
         target_coords = np.array([rs_state[0], rs_state[1]])
-        mir_coords = np.array([rs_state[3], rs_state[4]])
-        euclidean_dist_2d = np.linalg.norm(target_coords - mir_coords, axis=-1)
+        coords = np.array([rs_state[3], rs_state[4]])
+        euclidean_dist_2d = np.linalg.norm(target_coords - coords, axis=-1)
 
         # Reward base
         base_reward = -50 * euclidean_dist_2d
@@ -406,16 +404,8 @@ class NoObstacleNavigationWifibot(WifibotEnv):
 
         return reward, done, info
 
-
 class NoObstacleNavigationWifibotSim(NoObstacleNavigationWifibot, Simulation):
     cmd = "source /home/pierre/PycharmProjects/robo_gym_robot_servers_ws/devel/setup.bash; roslaunch wifibot_robot_server sim_wifibot_server_minimal.launch"
-
     def __init__(self, ip=None, lower_bound_port=None, upper_bound_port=None, gui=False, **kwargs):
         Simulation.__init__(self, self.cmd, ip, lower_bound_port, upper_bound_port, gui, **kwargs)
         NoObstacleNavigationWifibot.__init__(self, rs_address=self.robot_server_ip, **kwargs)
-
-
-class NoObstacleNavigationWifibotRob(NoObstacleNavigationWifibot):
-    real_robot = True
-
-
