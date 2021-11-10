@@ -3,6 +3,7 @@ from robo_gym.envs.example.example_env import ExampleEnvSim, ExampleEnvRob
 
 # Wifibot
 from robo_gym.envs.wifibot.wifibot import NoObstacleNavigationWifibotSim
+from robo_gym.envs.wifibot.wifibot import ObstacleAvoidanceWifibotSim
 
 # MiR100
 from robo_gym.envs.mir100.mir100 import NoObstacleNavigationMir100Sim, NoObstacleNavigationMir100Rob
