@@ -621,7 +621,7 @@ class ObstacleAvoidanceWifibot(WifibotEnv):
 
 
 class ObstacleAvoidanceWifibotSim(ObstacleAvoidanceWifibot, Simulation):
-    cmd = "roslaunch wifibot_robot_server sim_wifibot_server_minimal.launch world_name:=lab_6x8.world"
+    cmd = "source /home/pierre/PycharmProjects/robo_gym_robot_servers_ws/devel/setup.bash; roslaunch wifibot_robot_server sim_wifibot_server_minimal.launch world_name:=lab_6x8.world"
 
     def __init__(self, ip=None, lower_bound_port=None, upper_bound_port=None, gui=False, **kwargs):
         Simulation.__init__(self, self.cmd, ip, lower_bound_port, upper_bound_port, gui, **kwargs)

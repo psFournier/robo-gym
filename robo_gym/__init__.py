@@ -36,6 +36,11 @@ register(
 )
 
 register(
+    id='ObstacleAvoidanceWifibotSim-v0',
+    entry_point='robo_gym.envs:ObstacleAvoidanceWifibotSim',
+)
+
+register(
     id='ObstacleAvoidanceMir100Sim-v0',
     entry_point='robo_gym.envs:ObstacleAvoidanceMir100Sim',
 )
