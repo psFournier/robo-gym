@@ -10,6 +10,7 @@ from robo_gym.utils.exceptions import InvalidStateError, RobotServerError
 import robo_gym_server_modules.robot_server.client as rs_client
 from robo_gym.envs.simulation_wrapper import Simulation
 from robo_gym_server_modules.robot_server.grpc_msgs.python import robot_server_pb2
+import base64
 
 class WifibotEnv(gym.Env):
     """Wifibot base environment.
@@ -101,6 +102,7 @@ class WifibotEnv(gym.Env):
 
         # Get Robot Server state
         rs_state = copy.deepcopy(np.nan_to_num(np.array(self.client.get_state_msg().state)))
+        rs_image = copy.deepcopy(np.array(base64.b64decode(self.client.get_image_msg().b64image)))
 
         # Check if the length of the Robot Server state received is correct
         if not len(rs_state) == self._get_robot_server_state_len():
@@ -336,7 +338,7 @@ class WifibotEnv(gym.Env):
 
         """
 
-        if rs_state[1020] == 1:
+        if rs_state[1088] == 1:
             return True
         else:
             return False
@@ -353,7 +355,7 @@ class WifibotEnv(gym.Env):
         """
 
         threshold = 0.15
-        if min(rs_state[8:1020]) < threshold:
+        if min(rs_state[8:1088]) < threshold:
             return True
         else:
             return False
@@ -412,7 +414,7 @@ class NoObstacleNavigationWifibotSim(NoObstacleNavigationWifibot, Simulation):
 
 
 class ObstacleAvoidanceWifibot(WifibotEnv):
-    laser_len = 16
+    laser_len = 108
 
     def reset(self, start_pose=None, target_pose=None):
         """Environment reset.
@@ -502,9 +504,10 @@ class ObstacleAvoidanceWifibot(WifibotEnv):
         # End episode if robot is collides with an object, if it is too close
         # to an object.
         if not self.real_robot:
-            if self._sim_robot_collision(rs_state) or \
-                    self._min_laser_reading_below_threshold(rs_state) or \
-                    self._robot_close_to_sim_obstacle(rs_state):
+            sim_collision = self._sim_robot_collision(rs_state)
+            laser_collision = self._min_laser_reading_below_threshold(rs_state)
+            corner_collision = self._robot_close_to_sim_obstacle(rs_state)
+            if sim_collision or laser_collision or corner_collision:
                 reward = -200.0
                 done = True
                 info['final_status'] = 'collision'
@@ -621,7 +624,7 @@ class ObstacleAvoidanceWifibot(WifibotEnv):
 
 
 class ObstacleAvoidanceWifibotSim(ObstacleAvoidanceWifibot, Simulation):
-    cmd = "source /home/pierre/PycharmProjects/robo_gym_robot_servers_ws/devel/setup.bash; roslaunch wifibot_robot_server sim_wifibot_server_minimal.launch world_name:=lab_6x8.world"
+    cmd = "source /home/pierre/PycharmProjects/robo_gym_robot_servers_ws/devel/setup.bash; roslaunch wifibot_robot_server sim_wifibot_server_minimal.launch world_name:=lab_6x8"
 
     def __init__(self, ip=None, lower_bound_port=None, upper_bound_port=None, gui=False, **kwargs):
         Simulation.__init__(self, self.cmd, ip, lower_bound_port, upper_bound_port, gui, **kwargs)

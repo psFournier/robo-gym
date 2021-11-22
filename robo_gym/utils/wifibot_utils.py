@@ -52,8 +52,8 @@ class Wifibot():
 
         """
 
-        robot_x_dimension = 0.38
-        robot_y_dimension = 0.295
+        robot_x_dimension = 0.295
+        robot_y_dimension = 0.38
         dx = robot_x_dimension/2
         dy = robot_y_dimension/2
 
