@@ -17,4 +17,4 @@ model = TD3(MlpPolicy, env, verbose=1)
 model.learn(total_timesteps=15000)
 
 # save model
-model.save('td3_mir_basic')
+model.save('td3_wifibot_basic')

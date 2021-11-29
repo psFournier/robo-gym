@@ -413,7 +413,7 @@ class NoObstacleNavigationWifibot(WifibotEnv):
         return reward, done, info
 
 class NoObstacleNavigationWifibotSim(NoObstacleNavigationWifibot, Simulation):
-    cmd = "source /d/pfournie/Documents/paradis/robo-gym-ws/devel/setup.bash; roslaunch wifibot_robot_server sim_wifibot_server_minimal.launch"
+    cmd = "roslaunch wifibot_robot_server sim_wifibot_server_minimal.launch"
     def __init__(self, ip=None, lower_bound_port=None, upper_bound_port=None, gui=False, **kwargs):
         Simulation.__init__(self, self.cmd, ip, lower_bound_port, upper_bound_port, gui, **kwargs)
         NoObstacleNavigationWifibot.__init__(self, rs_address=self.robot_server_ip, **kwargs)
@@ -635,7 +635,7 @@ class ObstacleAvoidanceWifibot(WifibotEnv):
 
 
 class ObstacleAvoidanceWifibotSim(ObstacleAvoidanceWifibot, Simulation):
-    cmd = "source /home/pierre/PycharmProjects/robo_gym_robot_servers_ws/devel/setup.bash; roslaunch wifibot_robot_server sim_wifibot_server_minimal.launch world_name:=lab_6x8"
+    cmd = "roslaunch wifibot_robot_server sim_wifibot_server_minimal.launch world_name:=lab_6x8"
 
     def __init__(self, ip=None, lower_bound_port=None, upper_bound_port=None, gui=False, **kwargs):
         Simulation.__init__(self, self.cmd, ip, lower_bound_port, upper_bound_port, gui, **kwargs)
