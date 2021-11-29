@@ -575,7 +575,7 @@ class ObstacleAvoidanceWifibot(WifibotEnv):
         target_far_enough = False
         while not target_far_enough:
             x_t = self.np_random.uniform(low=-2.0, high=2.0)
-            if robot_coordinates[1] > 0:
+            if robot_coordinates[1] < 0:
                 y_t = self.np_random.uniform(low=-3.1, high=-2.1)
             else:
                 y_t = self.np_random.uniform(low=2.1, high=3.1)

@@ -8,7 +8,7 @@ from stable_baselines3.td3.policies import MlpPolicy
 target_machine_ip = '127.0.0.1' # or other xxx.xxx.xxx.xxx
 
 # initialize environment
-env = gym.make('ObstacleAvoidanceWifibotSim-v0', ip=target_machine_ip, gui=False)
+env = gym.make('ObstacleAvoidanceWifibotSim-v0', ip=target_machine_ip, gui=True)
 # add wrapper for automatic exception handling
 env = ExceptionHandling(env)
 
