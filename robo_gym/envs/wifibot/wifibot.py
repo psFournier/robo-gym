@@ -33,7 +33,7 @@ class WifibotEnv(gym.Env):
 
     real_robot = False
     laser_len = 1080
-    max_episode_steps = 100
+    max_episode_steps = 200
 
     def __init__(self, rs_address=None, **kwargs):
 
@@ -42,12 +42,12 @@ class WifibotEnv(gym.Env):
         self.observation_space = self._get_observation_space()
         self.action_space = spaces.Box(low=np.full((2), -1.0), high=np.full((2), 1.0), dtype=np.float32)
         self.seed()
-        self.distance_threshold = 0.2
+        self.distance_threshold = 0.5
         self.min_target_dist = 1.0
         # Maximum linear velocity (m/s) of wifibot
-        max_lin_vel = 0.5
+        max_lin_vel = 0.7
         # Maximum angular velocity (rad/s) of wifibot
-        max_ang_vel = 0.7
+        max_ang_vel = 1
         self.max_vel = np.array([max_lin_vel, max_ang_vel])
 
         # Connect to Robot Server
@@ -360,7 +360,7 @@ class WifibotEnv(gym.Env):
 
         """
 
-        threshold = 0.15
+        threshold = 0.30
         if min(rs_state[8:1088]) < threshold:
             return True
         else:
@@ -420,7 +420,7 @@ class NoObstacleNavigationWifibotSim(NoObstacleNavigationWifibot, Simulation):
 
 
 class ObstacleAvoidanceWifibot(WifibotEnv):
-    laser_len = 108
+    laser_len = 16
 
     def reset(self, start_pose=None, target_pose=None):
         """Environment reset.
@@ -492,25 +492,24 @@ class ObstacleAvoidanceWifibot(WifibotEnv):
         reward = 0
         done = False
         info = {}
-        linear_power = 0
-        angular_power = 0
 
         # Calculate distance to the target
         target_coords = np.array([rs_state[0], rs_state[1]])
-        mir_coords = np.array([rs_state[3], rs_state[4]])
-        euclidean_dist_2d = np.linalg.norm(target_coords - mir_coords, axis=-1)
+        coords = np.array([rs_state[3], rs_state[4]])
+        euclidean_dist_2d = np.linalg.norm(target_coords - coords, axis=-1)
 
         # Reward base
-        base_reward = -50 * euclidean_dist_2d
-        if self.prev_base_reward is not None:
-            reward = base_reward - self.prev_base_reward
-        self.prev_base_reward = base_reward
+        # base_reward = -50 * euclidean_dist_2d
+        # if self.prev_base_reward is not None:
+        #     reward = base_reward - self.prev_base_reward
+        # self.prev_base_reward = base_reward
 
         # Power used by the motors
         linear_power = abs(action[0] * 0.30)
         angular_power = abs(action[1] * 0.03)
         reward -= linear_power
         reward -= angular_power
+        reward -= 1
 
         # End episode if robot is collides with an object, if it is too close
         # to an object.
@@ -519,17 +518,17 @@ class ObstacleAvoidanceWifibot(WifibotEnv):
             laser_collision = self._min_laser_reading_below_threshold(rs_state)
             corner_collision = self._robot_close_to_sim_obstacle(rs_state)
             if sim_collision or laser_collision or corner_collision:
-                reward = -200.0
+                reward = -100.0
                 done = True
                 info['final_status'] = 'collision'
 
         if (euclidean_dist_2d < self.distance_threshold):
-            reward = 100
+            reward = 100.0
             done = True
             info['final_status'] = 'success'
 
         if self.elapsed_steps >= self.max_episode_steps:
-            done = True
+            done = False
             info['final_status'] = 'max_steps_exceeded'
 
         return reward, done, info
