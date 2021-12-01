@@ -101,8 +101,13 @@ class WifibotEnv(gym.Env):
             raise RobotServerError("set_state")
 
         # Get Robot Server state
-        rs_state = copy.deepcopy(np.nan_to_num(np.array(self.client.get_state_msg().state)))
-        rs_image = copy.deepcopy(np.array(base64.b64decode(self.client.get_image_msg().b64image)))
+        state_msg = self.client.get_state_msg()
+        rs_state = copy.deepcopy(np.nan_to_num(np.array(state_msg.state)))
+        w = state_msg.width
+        h = state_msg.height
+        c = state_msg.channel
+        img = np.frombuffer(state_msg.image, dtype=np.uint8)
+        rs_image = copy.deepcopy(np.reshape(img, (w, h, c), order='C'))
 
         # Check if the length of the Robot Server state received is correct
         if not len(rs_state) == self._get_robot_server_state_len():
@@ -135,15 +140,16 @@ class WifibotEnv(gym.Env):
             raise RobotServerError("send_action")
 
         # Get state from Robot Server
-        rs_state = self.client.get_state_msg().state
-        byte_image_msg = self.client.get_image_msg()
-        w = byte_image_msg.width
-        h = byte_image_msg.height
-        c = byte_image_msg.channel
-        img = np.frombuffer(byte_image_msg.image, dtype=np.uint8)
-        rs_image = copy.deepcopy(np.reshape(img, (w, h, c), order='C'))
+        state_msg = self.client.get_state_msg()
+        rs_state = state_msg.state
         # Convert the state from Robot Server format to environment format
         self.state = self._robot_server_state_to_env_state(rs_state)
+
+        w = state_msg.width
+        h = state_msg.height
+        c = state_msg.channel
+        img = np.frombuffer(state_msg.image, dtype=np.uint8)
+        rs_image = copy.deepcopy(np.reshape(img, (w, h, c), order='C'))
 
         # Check if the environment state is contained in the observation space
         if not self.observation_space.contains(self.state):
@@ -468,12 +474,13 @@ class ObstacleAvoidanceWifibot(WifibotEnv):
             raise RobotServerError("set_state")
 
         # Get Robot Server state
-        rs_state = copy.deepcopy(np.nan_to_num(np.array(self.client.get_state_msg().state)))
-        byte_image_msg = self.client.get_image_msg()
-        w = byte_image_msg.width
-        h = byte_image_msg.height
-        c = byte_image_msg.channel
-        rs_image = copy.deepcopy(np.reshape(np.frombuffer(byte_image_msg.image, dtype=np.uint8), (w,h,c), order='C'))
+        state_msg = self.client.get_state_msg()
+        rs_state = copy.deepcopy(np.nan_to_num(np.array(state_msg.state)))
+        w = state_msg.width
+        h = state_msg.height
+        c = state_msg.channel
+        img = np.frombuffer(state_msg.image, dtype=np.uint8)
+        rs_image = copy.deepcopy(np.reshape(img, (w, h, c), order='C'))
 
         # Check if the length of the Robot Server state received is correct
         if not len(rs_state) == self._get_robot_server_state_len():
@@ -528,7 +535,7 @@ class ObstacleAvoidanceWifibot(WifibotEnv):
             info['final_status'] = 'success'
 
         if self.elapsed_steps >= self.max_episode_steps:
-            done = False
+            done = True
             info['final_status'] = 'max_steps_exceeded'
 
         return reward, done, info
