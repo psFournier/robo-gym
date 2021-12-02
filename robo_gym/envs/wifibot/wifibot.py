@@ -10,7 +10,6 @@ from robo_gym.utils.exceptions import InvalidStateError, RobotServerError
 import robo_gym_server_modules.robot_server.client as rs_client
 from robo_gym.envs.simulation_wrapper import Simulation
 from robo_gym_server_modules.robot_server.grpc_msgs.python import robot_server_pb2
-import base64
 
 class WifibotEnv(gym.Env):
     """Wifibot base environment.
@@ -33,7 +32,7 @@ class WifibotEnv(gym.Env):
 
     real_robot = False
     laser_len = 1080
-    max_episode_steps = 200
+    max_episode_steps = 100
 
     def __init__(self, rs_address=None, **kwargs):
 
@@ -42,12 +41,12 @@ class WifibotEnv(gym.Env):
         self.observation_space = self._get_observation_space()
         self.action_space = spaces.Box(low=np.full((2), -1.0), high=np.full((2), 1.0), dtype=np.float32)
         self.seed()
-        self.distance_threshold = 0.5
+        self.distance_threshold = 0.2
         self.min_target_dist = 1.0
         # Maximum linear velocity (m/s) of wifibot
         max_lin_vel = 0.7
         # Maximum angular velocity (rad/s) of wifibot
-        max_ang_vel = 1
+        max_ang_vel = 1.
         self.max_vel = np.array([max_lin_vel, max_ang_vel])
 
         # Connect to Robot Server
@@ -103,11 +102,11 @@ class WifibotEnv(gym.Env):
         # Get Robot Server state
         state_msg = self.client.get_state_msg()
         rs_state = copy.deepcopy(np.nan_to_num(np.array(state_msg.state)))
-        w = state_msg.width
-        h = state_msg.height
-        c = state_msg.channel
-        img = np.frombuffer(state_msg.image, dtype=np.uint8)
-        rs_image = copy.deepcopy(np.reshape(img, (w, h, c), order='C'))
+        # w = state_msg.width
+        # h = state_msg.height
+        # c = state_msg.channel
+        # img = np.frombuffer(state_msg.image, dtype=np.uint8)
+        # rs_image = copy.deepcopy(np.reshape(img, (w, h, c), order='C'))
 
         # Check if the length of the Robot Server state received is correct
         if not len(rs_state) == self._get_robot_server_state_len():
@@ -157,6 +156,13 @@ class WifibotEnv(gym.Env):
 
         # Assign reward
         reward, done, info = self._reward(rs_state=rs_state, action=action)
+        # print("Step: ", self.elapsed_steps)
+        # print("Action from policy: ", repr(action))
+        # print("Action sent to robot_server: ", repr(rs_action))
+        # print("State from robot_server post action: ", repr(rs_state))
+        # print("RL env state: ", repr(self.state))
+        # print("Reward: ", reward)
+        # print("Done: ", done)
 
         return self.state, reward, done, info
 
@@ -426,7 +432,7 @@ class NoObstacleNavigationWifibotSim(NoObstacleNavigationWifibot, Simulation):
 
 
 class ObstacleAvoidanceWifibot(WifibotEnv):
-    laser_len = 16
+    laser_len = 10
 
     def reset(self, start_pose=None, target_pose=None):
         """Environment reset.
@@ -506,17 +512,16 @@ class ObstacleAvoidanceWifibot(WifibotEnv):
         euclidean_dist_2d = np.linalg.norm(target_coords - coords, axis=-1)
 
         # Reward base
-        # base_reward = -50 * euclidean_dist_2d
-        # if self.prev_base_reward is not None:
-        #     reward = base_reward - self.prev_base_reward
-        # self.prev_base_reward = base_reward
+        base_reward = -50*euclidean_dist_2d
+        if self.prev_base_reward is not None:
+            reward = base_reward - self.prev_base_reward
+        self.prev_base_reward = base_reward
 
         # Power used by the motors
-        linear_power = abs(action[0] * 0.30)
-        angular_power = abs(action[1] * 0.03)
-        reward -= linear_power
-        reward -= angular_power
-        reward -= 1
+        linear_power = abs(action[0] *0.30)
+        angular_power = abs(action[1] *0.03)
+        reward-= linear_power
+        reward-= angular_power
 
         # End episode if robot is collides with an object, if it is too close
         # to an object.
@@ -525,7 +530,7 @@ class ObstacleAvoidanceWifibot(WifibotEnv):
             laser_collision = self._min_laser_reading_below_threshold(rs_state)
             corner_collision = self._robot_close_to_sim_obstacle(rs_state)
             if sim_collision or laser_collision or corner_collision:
-                reward = -100.0
+                reward = -200.0
                 done = True
                 info['final_status'] = 'collision'
 
