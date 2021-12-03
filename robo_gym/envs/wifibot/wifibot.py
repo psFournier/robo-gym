@@ -10,8 +10,9 @@ from robo_gym.utils.exceptions import InvalidStateError, RobotServerError
 import robo_gym_server_modules.robot_server.client as rs_client
 from robo_gym.envs.simulation_wrapper import Simulation
 from robo_gym_server_modules.robot_server.grpc_msgs.python import robot_server_pb2
+from gym import GoalEnv, Env
 
-class WifibotEnv(gym.Env):
+class WifibotEnv(GoalEnv):
     """Wifibot base environment.
 
     Args:
@@ -36,6 +37,7 @@ class WifibotEnv(gym.Env):
 
     def __init__(self, rs_address=None, **kwargs):
 
+        super(WifibotEnv, self).__init__()
         self.wifibot = wifibot_utils.Wifibot()
         self.elapsed_steps = 0
         self.observation_space = self._get_observation_space()
@@ -154,8 +156,9 @@ class WifibotEnv(gym.Env):
         if not self.observation_space.contains(self.state):
             raise InvalidStateError()
 
-        # Assign reward
-        reward, done, info = self._reward(rs_state=rs_state, action=action)
+        info = {}
+        info['action'] = action
+        reward, done, info = self.compute_reward(self.state['achieved_goal'], self.state['desired_goal'], info)
         # print("Step: ", self.elapsed_steps)
         # print("Action from policy: ", repr(action))
         # print("Action sent to robot_server: ", repr(rs_action))
@@ -201,10 +204,10 @@ class WifibotEnv(gym.Env):
 
         """
 
-        target_polar_coordinates = [0.0] * 2
+        target_and_robot_coordinates = [0.0] * 5
         twist = [0.0] * 2
         laser = [0.0] * self.laser_len
-        env_state = target_polar_coordinates + twist + laser
+        env_state = target_and_robot_coordinates + twist + laser
 
         return len(env_state)
 
@@ -268,14 +271,6 @@ class WifibotEnv(gym.Env):
         # Convert to numpy array and remove NaN values
         rs_state = np.nan_to_num(np.array(rs_state))
 
-        # Transform cartesian coordinates of target to polar coordinates
-        polar_r, polar_theta = utils.cartesian_to_polar_2d(x_target=rs_state[0], \
-                                                           y_target=rs_state[1], \
-                                                           x_origin=rs_state[3], \
-                                                           y_origin=rs_state[4])
-        # Rotate origin of polar coordinates frame to be matching with robot frame and normalize to +/- pi
-        polar_theta = utils.normalize_angle_rad(polar_theta - rs_state[5])
-
         # Get Laser scanners data
         raw_laser_scan = rs_state[8:1088]
 
@@ -283,10 +278,10 @@ class WifibotEnv(gym.Env):
         if self.laser_len > 0:
             laser = utils.downsample_list_to_len(raw_laser_scan, self.laser_len)
             # Compose environment state
-            state = np.concatenate((np.array([polar_r, polar_theta]), rs_state[6:8], laser))
+            state = np.concatenate((rs_state[:2], rs_state[3:8], laser))
         else:
             # Compose environment state
-            state = np.concatenate((np.array([polar_r, polar_theta]), rs_state[6:8]))
+            state = np.concatenate((rs_state[:2], rs_state[3:8]))
 
         return state
 
@@ -299,8 +294,11 @@ class WifibotEnv(gym.Env):
         """
 
         # Target coordinates range
-        max_target_coords = np.array([np.inf, np.pi])
-        min_target_coords = np.array([-np.inf, -np.pi])
+        max_target_coords = np.array([np.inf, np.inf])
+        min_target_coords = np.array([-np.inf, -np.inf])
+        # Robot coordinates range
+        max_robot_coords = np.array([np.inf, np.inf, np.pi])
+        min_robot_coords = np.array([-np.inf, -np.inf, -np.pi])
         # Robot velocity range tolerance
         vel_tolerance = 0.1
         # Robot velocity range used to determine if there is an error in the sensor readings
@@ -314,10 +312,28 @@ class WifibotEnv(gym.Env):
         max_laser = np.full(self.laser_len, 29.0)
         min_laser = np.full(self.laser_len, 0.0)
         # Definition of environment observation_space
-        max_obs = np.concatenate((max_target_coords, max_vel, max_laser))
-        min_obs = np.concatenate((min_target_coords, min_vel, min_laser))
+        max_obs = np.concatenate((max_target_coords, max_robot_coords, max_vel, max_laser))
+        min_obs = np.concatenate((min_target_coords, min_robot_coords, min_vel, min_laser))
 
-        return spaces.Box(low=min_obs, high=max_obs, dtype=np.float32)
+        return spaces.Dict(
+            {
+                "observation": spaces.Box(
+                    low=min_obs,
+                    high=max_obs,
+                    dtype=np.float32
+                ),
+                "achieved_goal": spaces.Box(
+                    low=min_target_coords,
+                    high=max_target_coords,
+                    dtype=np.float32
+                ),
+                "desired_goal": spaces.Box(
+                    low=min_target_coords,
+                    high=max_target_coords,
+                    dtype=np.float32
+                )
+            }
+        )
 
     def _robot_outside_of_boundary_box(self, robot_coordinates):
         """Check if robot is outside of boundary box.
@@ -381,6 +397,51 @@ class WifibotEnv(gym.Env):
 class NoObstacleNavigationWifibot(WifibotEnv):
     laser_len = 0
 
+    def compute_reward(self, achieved_goal, desired_goal, info):
+
+        reward = 0
+        done = False
+        info = {}
+        linear_power = 0
+        angular_power = 0
+
+        # Calculate distance to the target
+        target_coords = np.array([rs_state[0], rs_state[1]])
+        coords = np.array([rs_state[3], rs_state[4]])
+        euclidean_dist_2d = np.linalg.norm(target_coords - coords, axis=-1)
+
+        # Reward base
+        base_reward = -50 * euclidean_dist_2d
+        if self.prev_base_reward is not None:
+            reward = base_reward - self.prev_base_reward
+        self.prev_base_reward = base_reward
+
+        # Power used by the motors
+        linear_power = abs(action[0] * 0.30)
+        angular_power = abs(action[1] * 0.03)
+        reward -= linear_power
+        reward -= angular_power
+
+        # End episode if robot is outside of boundary box
+        if self._robot_outside_of_boundary_box(rs_state[3:5]):
+            reward = -200.0
+            done = True
+            info['final_status'] = 'out of boundary'
+
+        # The episode terminates with success if the distance between the robot
+        # and the target is less than the distance threshold.
+        if (euclidean_dist_2d < self.distance_threshold):
+            reward = 200.0
+            done = True
+            info['final_status'] = 'success'
+
+        if self.elapsed_steps >= self.max_episode_steps:
+            done = True
+            info['final_status'] = 'max_steps_exceeded'
+
+        return reward, done, info
+
+
     def _reward(self, rs_state, action):
         reward = 0
         done = False
@@ -423,6 +484,8 @@ class NoObstacleNavigationWifibot(WifibotEnv):
             info['final_status'] = 'max_steps_exceeded'
 
         return reward, done, info
+
+
 
 class NoObstacleNavigationWifibotSim(NoObstacleNavigationWifibot, Simulation):
     cmd = "roslaunch wifibot_robot_server sim_wifibot_server_minimal.launch"
