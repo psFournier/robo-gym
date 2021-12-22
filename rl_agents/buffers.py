@@ -7,8 +7,8 @@ class ReplayBuffer():
 	def __init__(self, buffer_limit):
 		self.buffer = collections.deque(maxlen=buffer_limit)
 
-	def put(self, transition):
-		self.buffer.append(transition)
+	def put(self, tuple):
+		self.buffer.append(tuple)
 
 	def sample(self, n):
 		mini_batch = random.sample(self.buffer, n)
