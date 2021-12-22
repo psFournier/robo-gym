@@ -4,6 +4,7 @@ venv/
 *.egg-info
 /.vscode
 *.zip
+docs/examples/runs/
 
 # Setuptools
 /build
